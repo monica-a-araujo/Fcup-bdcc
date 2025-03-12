@@ -1,8 +1,7 @@
 import concurrent.futures
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, redirect
 from google.cloud import bigquery
-
 
 app = Flask(__name__)
 bigquery_client = bigquery.Client()
@@ -43,10 +42,39 @@ def user():
 
         data = {}
         # Find a way to fetch only the row instead of iterating over it
-
         for row in rows:
             data = {"subject_id":row["SUBJECT_ID"], "gender":row["GENDER"],"dob":row["DOB"],"dod":row["DOD"]}
+
         return jsonify(data)
+
+    elif request.method== "POST":
+        patient_id = request.args.get('patient_id',type=int)
+        query_job = bigquery_client.query(
+            """
+            SELECT *
+            FROM `project-bdcc.MIMIC.PATIENTS`
+            WHERE SUBJECT_ID=%d
+            """ % patient_id
+        )
+        rows = query_job.result()
+        if (rows.total_rows != 1):
+            return "Patient doesnt exist"
+
+        update_data = request.form
+        update_values = ""
+        for camp in update_data.keys():
+            update_values += camp + "=" + update_data[camp] + ","
+        update_values = update_values[:-1] # Remove the last comma
+
+        query_job = bigquery_client.query(
+            """
+            UPDATE `project-bdcc.MIMIC.PATIENTS`
+            SET %s
+            WHERE SUBJECT_ID=%d
+            """ % (update_values,patient_id)
+        )
+        rows = query_job.result()
+        return redirect("/rest/user?patient_id=%d" % patient_id)
 
     elif request.method == "DELETE":
         patient_id = request.args.get('patient_id', type=int)
