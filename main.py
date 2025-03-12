@@ -30,7 +30,51 @@ def user():
     if request.method == "GET":
         patient_id = request.args.get('patient_id', type=int)
 
-        return "Hello " + str(patient_id)
+        query_job = bigquery_client.query(
+            """
+            SELECT *
+            FROM `project-bdcc.MIMIC.PATIENTS`
+            WHERE SUBJECT_ID=%d
+            """ % patient_id
+        )
+        rows = query_job.result()
+        if (rows.total_rows != 1):
+            return "Patient doesnt exist"
+
+        data = {}
+        # Find a way to fetch only the row instead of iterating over it
+
+        for row in rows:
+            data = {"subject_id":row["SUBJECT_ID"], "gender":row["GENDER"],"dob":row["DOB"],"dod":row["DOD"]}
+        return jsonify(data)
+
+    elif request.method == "DELETE":
+        patient_id = request.args.get('patient_id', type=int)
+        query_job = bigquery_client.query(
+            """
+            SELECT *
+            FROM `project-bdcc.MIMIC.PATIENTS`
+            WHERE SUBJECT_ID=%d
+            """ % patient_id
+        )
+        rows = query_job.result()
+        if (rows.total_rows != 1):
+            return "Patient doesnt exist"
+
+        query_job = bigquery_client.query(
+            """
+            BEGIN TRANSACTION;
+            DELETE FROM `project-bdcc.MIMIC.PATIENTS` WHERE SUBJECT_ID=%d;
+            UPDATE `project-bdcc.MIMIC.ADMISSIONS` SET SUBJECT_ID=-1 WHERE SUBJECT_ID=%d;
+            UPDATE `project-bdcc.MIMIC.LABEVENTS` SET SUBJECT_ID=-1 WHERE SUBJECT_ID=%d;
+            UPDATE `project-bdcc.MIMIC.INPUTEVENTS` SET SUBJECT_ID=-1 WHERE SUBJECT_ID=%d;
+            COMMIT TRANSACTION;
+            """ % (patient_id,patient_id,patient_id,patient_id)
+        )
+
+        query_job.result()
+        return "Patiend %d deleted" % patient_id
+
 
 @app.route("/listprogress/<patient_id>")
 def get_progress(patient_id):
