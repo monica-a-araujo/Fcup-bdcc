@@ -2,9 +2,14 @@ import concurrent.futures
 
 from flask import Flask, jsonify, request, redirect
 from google.cloud import bigquery
+from google.appengine.ext import blobstore
+from google.appengine.ext import ndb
+from google.appengine.api import wrap_wsgi_app
 
 app = Flask(__name__)
 bigquery_client = bigquery.Client()
+app.wsgi_app = wrap_wsgi_app(app.wsgi_app, use_deferred=True)
+
 
 
 @app.route("/")
@@ -195,6 +200,74 @@ def get_longestwaiting():
     data = [ (row["SUBJECT_ID"],row["TIMEPASSED"]) for row in rows]
 
     return jsonify(data)
+
+# ----
+
+class UserMedia(ndb.Model):
+    iduser = ndb.StringProperty()
+    blob_key = ndb.BlobKeyProperty()
+    upload_time = ndb.DateTimeProperty(auto_now_add=True)
+
+@app.route("/mediauploadform/<iduser>")
+def upload_media_form(iduser):
+    """Formulário para upload de ficheiros."""
+    upload_url = blobstore.create_upload_url(f"/mediauploaded_treatment/{iduser}")
+
+    response = """
+  <html><body>
+  <form action="{}" method="POST" enctype="multipart/form-data">
+    Upload File: <input type="file" name="file"><br>
+    <input type="submit" name="submit" value="Submit Now">
+  </form>
+  </body></html>""".format(upload_url)
+
+    return response
+
+@app.route("/mediauploaded_treatment/<iduser>", methods=["POST"])
+def upload_media_treatment(iduser):
+    """Endpoint que recebe o upload do ficheiro"""
+    return MediaUploadHandler().post(iduser)
+    
+class MediaUploadHandler(blobstore.BlobstoreUploadHandler):
+    def post(self, iduser):
+        """Handles file upload and stores blob key in BigQuery."""
+        upload = self.get_uploads(request.environ)[0]  
+        media = UserMedia(blob_key=upload.key(), iduser=iduser)
+        media.put()
+
+        return redirect("/userfiles/{}/{}".format(iduser, upload.key()))
+
+
+@app.route("/userfiles/<iduser>/<blob_key>")
+def view_user_files(iduser, blob_key):
+    return MediaDownloadHandler(iduser).get(blob_key)
+
+class MediaDownloadHandler(blobstore.BlobstoreDownloadHandler):
+    def __init__(self, iduser):
+        self.iduser = iduser 
+
+    def get(self, media_key): #todo
+        if not blobstore.get(media_key):
+            return "Photo key not found", 404
+        else:
+            headers = self.send_blob(request.environ, media_key)
+
+            # Prevent Flask from setting a default content-type.
+            # GAE sets it to a guessed type if the header is not set.
+            headers["Content-Type"] = None
+            return "", headers 
+
+@app.route("/list_media")
+def list_media():
+    """Verifica os dados guardados no Datastore."""
+    media = UserMedia.query().fetch()
+    
+    if not media:
+        return "Nenhuma media encontrada no Datastore."
+
+    return "<br>".join(
+        [f"iduser: {media.iduser},\n Blob Key: {media.blob_key},\n Upload Time: {media.upload_time}" for media in media]
+    )
 
 if __name__ == "__main__":
     # This is used when running locally only. When deploying to Google App

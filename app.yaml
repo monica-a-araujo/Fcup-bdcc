@@ -13,3 +13,8 @@
 # limitations under the License.
 
 runtime: python39
+app_engine_apis: true
+
+handlers:
+- url: .*
+  script: auto
