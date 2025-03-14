@@ -1,2 +1,4 @@
 google-cloud-bigquery==3.10.0
 Flask==3.0.0
+appengine-python-standard>=0.2.3
+Werkzeug==3.0.3
