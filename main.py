@@ -6,7 +6,6 @@ from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 from google.appengine.api import wrap_wsgi_app
 
-
 app = Flask(__name__)
 bigquery_client = bigquery.Client()
 app.wsgi_app = wrap_wsgi_app(app.wsgi_app, use_deferred=True)
@@ -35,7 +34,80 @@ def user():
     if request.method == "GET":
         patient_id = request.args.get('patient_id', type=int)
 
-        return "Hello " + str(patient_id)
+        query_job = bigquery_client.query(
+            """
+            SELECT *
+            FROM `project-bdcc.MIMIC.PATIENTS`
+            WHERE SUBJECT_ID=%d
+            """ % patient_id
+        )
+        rows = query_job.result()
+        if (rows.total_rows != 1):
+            return "Patient doesnt exist"
+
+        data = {}
+        # Find a way to fetch only the row instead of iterating over it
+        for row in rows:
+            data = {"subject_id":row["SUBJECT_ID"], "gender":row["GENDER"],"dob":row["DOB"],"dod":row["DOD"]}
+
+        return jsonify(data)
+
+    elif request.method== "POST":
+        patient_id = request.args.get('patient_id',type=int)
+        query_job = bigquery_client.query(
+            """
+            SELECT *
+            FROM `project-bdcc.MIMIC.PATIENTS`
+            WHERE SUBJECT_ID=%d
+            """ % patient_id
+        )
+        rows = query_job.result()
+        if (rows.total_rows != 1):
+            return "Patient doesnt exist"
+
+        update_data = request.form
+        update_values = ""
+        for camp in update_data.keys():
+            update_values += camp + "=" + update_data[camp] + ","
+        update_values = update_values[:-1] # Remove the last comma
+
+        query_job = bigquery_client.query(
+            """
+            UPDATE `project-bdcc.MIMIC.PATIENTS`
+            SET %s
+            WHERE SUBJECT_ID=%d
+            """ % (update_values,patient_id)
+        )
+        rows = query_job.result()
+        return redirect("/rest/user?patient_id=%d" % patient_id)
+
+    elif request.method == "DELETE":
+        patient_id = request.args.get('patient_id', type=int)
+        query_job = bigquery_client.query(
+            """
+            SELECT *
+            FROM `project-bdcc.MIMIC.PATIENTS`
+            WHERE SUBJECT_ID=%d
+            """ % patient_id
+        )
+        rows = query_job.result()
+        if (rows.total_rows != 1):
+            return "Patient doesnt exist"
+
+        query_job = bigquery_client.query(
+            """
+            BEGIN TRANSACTION;
+            DELETE FROM `project-bdcc.MIMIC.PATIENTS` WHERE SUBJECT_ID=%d;
+            UPDATE `project-bdcc.MIMIC.ADMISSIONS` SET SUBJECT_ID=-1 WHERE SUBJECT_ID=%d;
+            UPDATE `project-bdcc.MIMIC.LABEVENTS` SET SUBJECT_ID=-1 WHERE SUBJECT_ID=%d;
+            UPDATE `project-bdcc.MIMIC.INPUTEVENTS` SET SUBJECT_ID=-1 WHERE SUBJECT_ID=%d;
+            COMMIT TRANSACTION;
+            """ % (patient_id,patient_id,patient_id,patient_id)
+        )
+
+        query_job.result()
+        return "Patiend %d deleted" % patient_id
+
 
 @app.route("/listprogress/<patient_id>")
 def get_progress(patient_id):
