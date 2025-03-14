@@ -169,15 +169,17 @@ def get_longestwaiting():
 
     return jsonify(data)
 
+# ----
+
 class UserMedia(ndb.Model):
     iduser = ndb.StringProperty()
     blob_key = ndb.BlobKeyProperty()
     upload_time = ndb.DateTimeProperty(auto_now_add=True)
 
-@app.route("/mediauploadform")
-def upload_media_form():
+@app.route("/mediauploadform/<iduser>")
+def upload_media_form(iduser):
     """Formulário para upload de ficheiros."""
-    upload_url = blobstore.create_upload_url("/mediauploaded_treatment")
+    upload_url = blobstore.create_upload_url(f"/mediauploaded_treatment/{iduser}")
 
     response = """
   <html><body>
@@ -189,26 +191,30 @@ def upload_media_form():
 
     return response
 
-@app.route("/mediauploaded_treatment", methods=["POST"])
-def upload_media_treatment():
+@app.route("/mediauploaded_treatment/<iduser>", methods=["POST"])
+def upload_media_treatment(iduser):
     """Endpoint que recebe o upload do ficheiro"""
-    return MediaUploadHandler().post()
-
+    return MediaUploadHandler().post(iduser)
+    
 class MediaUploadHandler(blobstore.BlobstoreUploadHandler):
-    def post(self):
+    def post(self, iduser):
         """Handles file upload and stores blob key in BigQuery."""
         upload = self.get_uploads(request.environ)[0]  
-        media = UserMedia(blob_key=upload.key(), iduser="1")
+        media = UserMedia(blob_key=upload.key(), iduser=iduser)
         media.put()
 
-        return redirect("/userfiles/1/%s" % upload.key())
+        return redirect("/userfiles/{}/{}".format(iduser, upload.key()))
 
-@app.route("/userfiles/1/<blob_key>")
-def view_user_files(blob_key):
-    return MediaDownloadHandler().get(blob_key)
+
+@app.route("/userfiles/<iduser>/<blob_key>")
+def view_user_files(iduser, blob_key):
+    return MediaDownloadHandler(iduser).get(blob_key)
 
 class MediaDownloadHandler(blobstore.BlobstoreDownloadHandler):
-    def get(self, media_key):
+    def __init__(self, iduser):
+        self.iduser = iduser 
+
+    def get(self, media_key): #todo
         if not blobstore.get(media_key):
             return "Photo key not found", 404
         else:
