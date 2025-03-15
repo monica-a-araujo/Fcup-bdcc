@@ -211,6 +211,10 @@ class UserMedia(ndb.Model):
 @app.route("/mediauploadform/<iduser>")
 def upload_media_form(iduser):
     """Formulário para upload de ficheiros."""
+
+    if not user_exists(iduser):
+        return "User not found", 404
+    
     upload_url = blobstore.create_upload_url(f"/mediauploaded_treatment/{iduser}")
 
     response = """
@@ -222,6 +226,18 @@ def upload_media_form(iduser):
   </body></html>""".format(upload_url)
 
     return response
+
+def user_exists(iduser):
+    query = f"""
+        SELECT COUNT(*) as count
+        FROM `project-bdcc.MIMIC.PATIENTS`
+        WHERE SUBJECT_ID = {iduser}
+    """
+    query_job = bigquery_client.query(query)
+    result = query_job.result()
+
+    row = next(result, None)
+    return row["count"] > 0 if row else False
 
 @app.route("/mediauploaded_treatment/<iduser>", methods=["POST"])
 def upload_media_treatment(iduser):
@@ -288,16 +304,12 @@ def list_media():
 
     response += """
         </ul>
-        <p><a href="//mediauploadform/12">Return to upload form</a></p>
+        <p><a href="/mediauploadform/12">Return to upload form</a></p> 
         </body></html>
-    """
+    """#testar
     
     return response
 
-
-    #return "<br>".join(
-    #    [f"iduser: {m.iduser}, Blob Key: {m.blob_key}, Upload Time: {m.upload_time}" for m in media]
-    #)
 
 if __name__ == "__main__":
     # This is used when running locally only. When deploying to Google App
