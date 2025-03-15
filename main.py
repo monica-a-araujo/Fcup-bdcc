@@ -203,10 +203,10 @@ class MediaUploadHandler(blobstore.BlobstoreUploadHandler):
         media = UserMedia(blob_key=upload.key(), iduser=iduser)
         media.put()
 
-        return redirect("/userfiles/{}/{}".format(iduser, upload.key()))
+        return redirect("/usermedia/{}/{}".format(iduser, upload.key()))
 
 
-@app.route("/userfiles/<iduser>/<blob_key>")
+@app.route("/usermedia/<iduser>/<blob_key>")
 def view_user_files(iduser, blob_key):
     return MediaDownloadHandler(iduser).get(blob_key)
 
@@ -229,13 +229,43 @@ class MediaDownloadHandler(blobstore.BlobstoreDownloadHandler):
 def list_media():
     """Verifica os dados guardados no Datastore."""
     media = UserMedia.query().fetch()
-    
-    if not media:
-        return "Nenhuma media encontrada no Datastore."
 
-    return "<br>".join(
-        [f"iduser: {media.iduser},\n Blob Key: {media.blob_key},\n Upload Time: {media.upload_time}" for media in media]
-    )
+    if not media:
+        return "Nenhuma media encontrada."
+    
+    media_urls = [f"/usermedia/{item.iduser}/{item.blob_key}" for item in media]
+    media_count = len(media)
+
+    response = """<html><body>
+        <h1>Media</h1>
+        <h2>{} media uploaded:</h2>
+        <ul>
+        """.format(media_count)
+
+    for index, item in enumerate(media):
+        response += """
+            <li>
+                <h3>File {}:</h3>
+                <p>- blob key: {}</p>
+                <p>- User id: {}</p>
+                <p>- Upload time: {}</p>
+                <a href="{}">Download</a>
+            </li>
+            <br>
+        """.format(index + 1, item.blob_key, item.iduser, item.upload_time, media_urls[index])
+
+    response += """
+        </ul>
+        <p><a href="//mediauploadform/12">Return to upload form</a></p>
+        </body></html>
+    """
+    
+    return response
+
+
+    #return "<br>".join(
+    #    [f"iduser: {m.iduser}, Blob Key: {m.blob_key}, Upload Time: {m.upload_time}" for m in media]
+    #)
 
 if __name__ == "__main__":
     # This is used when running locally only. When deploying to Google App
