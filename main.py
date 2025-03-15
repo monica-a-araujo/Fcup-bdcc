@@ -29,8 +29,9 @@ def querylimits():
 
     return jsonify(data)
 
-@app.route("/rest/user", methods=["GET","POST","DELETE"])
+@app.route("/rest/user", methods=["GET","POST", "PUT","DELETE"])
 def user():
+    # Get information of a patient
     if request.method == "GET":
         patient_id = request.args.get('patient_id', type=int)
 
@@ -45,14 +46,44 @@ def user():
         if (rows.total_rows != 1):
             return "Patient doesnt exist"
 
-        data = {}
-        # Find a way to fetch only the row instead of iterating over it
-        for row in rows:
-            data = {"subject_id":row["SUBJECT_ID"], "gender":row["GENDER"],"dob":row["DOB"],"dod":row["DOD"]}
+        row = next(rows.__iter__())
+        data = {"subject_id":row["SUBJECT_ID"], "gender":row["GENDER"],"dob":row["DOB"],"dod":row["DOD"]}
 
         return jsonify(data)
 
-    elif request.method== "POST":
+    # Insert a new patient into system
+    elif request.method == "POST":
+
+        insert_data = request.form
+        col_names = ",".join(insert_data.keys())
+        col_values = ",".join(insert_data.values())
+
+        query_job = bigquery_client.query(
+            """
+            SELECT MAX(ROW_ID) AS R, MAX(SUBJECT_ID) AS S
+            FROM `project-bdcc.MIMIC.PATIENTS`
+            """
+        )
+
+        rows = query_job.result()
+
+        row = next(rows.__iter__())
+        row_id = row["R"] + 1
+        subject_id = row["S"] + 1
+
+        query_job = bigquery_client.query(
+            """
+            INSERT INTO `project-bdcc.MIMIC.PATIENTS` (%s,%s,%s)
+            VALUES (%d,%d,%s)
+            """ % ("ROW_ID","SUBJECT_ID",col_names,row_id,subject_id,col_values)
+        )
+        rows = query_job.result()
+
+        return "Patient added with subject_id:%d" % subject_id
+
+
+    # Update current patient's information
+    elif request.method== "PUT":
         patient_id = request.args.get('patient_id',type=int)
         query_job = bigquery_client.query(
             """
@@ -79,8 +110,9 @@ def user():
             """ % (update_values,patient_id)
         )
         rows = query_job.result()
-        return redirect("/rest/user?patient_id=%d" % patient_id)
+        return "Patient updated"
 
+    # Delete patient
     elif request.method == "DELETE":
         patient_id = request.args.get('patient_id', type=int)
         query_job = bigquery_client.query(
