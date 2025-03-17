@@ -140,6 +140,101 @@ def user():
         query_job.result()
         return "Patiend %d deleted" % patient_id
 
+@app.route("/rest/patients/<patient_id>/question",methods=["GET","PUT"])
+def handle_questions(patient_id):
+    # Falta verificar se user existe
+    if request.method == "GET":
+        query_job = bigquery_client.query(
+            """
+            SELECT *
+            FROM `project-bdcc.MIMIC.Questions`
+            WHERE PATIENT_ID=%s
+            ORDER BY TIME_QUESTION ASC
+            """ % patient_id
+        )
+        rows = query_job.result()
+        questions = []
+
+        for row in rows:
+            q = {"question_id":row["QUESTION_ID"],"question":row["QUESTION"],"cgid":row["CGID"],"answer":row["ANSWER"],"time_question":row["TIME_QUESTION"],"time_answer":row["TIME_ANSWER"],"done":row["DONE"]}
+            questions.append(q)
+
+        return jsonify(questions)
+
+    # Falta verificar se user existe e se cgid dado e valido
+    elif request.method == "PUT":
+        question_data = request.form
+
+        query_job = bigquery_client.query(
+            """
+            SELECT MAX(QUESTION_ID) as MAX
+            FROM `project-bdcc.MIMIC.Questions`
+            """
+        )
+        rows = query_job.result()
+        row = next(rows.__iter__())
+        if (row["MAX"] == None):
+            question_id = 0
+        else:
+            question_id = row["MAX"] + 1
+
+        query_job = bigquery_client.query(
+            """
+            INSERT INTO `project-bdcc.MIMIC.Questions` (QUESTION_ID,PATIENT_ID,QUESTION,CGID,DONE,TIME_QUESTION)
+            VALUES (%d,%s,%s,%s,FALSE,CURRENT_TIMESTAMP)
+            """ % (question_id,patient_id,question_data["QUESTION"],question_data["CGID"])
+        )
+        query_job.result()
+        return "Question added"
+
+@app.route("/rest/patients/<patient_id>/getpossiblecgid",methods=["GET"])
+def get_possible_cgids(patient_id):
+    query_job = bigquery_client.query(
+        """
+        SELECT DISTINCT(CGID)
+        FROM `project-bdcc.MIMIC.INPUTEVENTS`
+        WHERE SUBJECT_ID=%s
+        """ % patient_id
+    )
+
+    rows = query_job.result()
+    cgids = sorted([row["CGID"] for row in rows])
+
+    return jsonify(cgids)
+
+@app.route("/rest/caregivers/<cgid>/question",methods=["GET","POST"])
+def handle_caregivers(cgid):
+    if request.method == "GET":
+        query_job = bigquery_client.query(
+            """
+            SELECT *
+            FROM `project-bdcc.MIMIC.Questions`
+            WHERE CGID=%s
+            """ % cgid
+        )
+        rows = query_job.result()
+
+        questions = []
+        for row in rows:
+            q = {"question_id":row["QUESTION_ID"],"patient_id":row["PATIENT_ID"],"question":row["QUESTION"],"answer":row["ANSWER"],"time_question":row["TIME_QUESTION"],"time_answer":row["TIME_ANSWER"],"done":row["DONE"]}
+            questions.append(q)
+
+        return jsonify(questions)
+    elif request.method == "POST":
+        answer_data = request.form
+
+        query_job = bigquery_client.query(
+            """
+            UPDATE `project-bdcc.MIMIC.Questions`
+            SET ANSWER=%s, TIME_ANSWER=CURRENT_TIMESTAMP, DONE=TRUE
+            WHERE QUESTION_ID=%s
+            """ % (answer_data["ANSWER"],answer_data["QUESTION_ID"])
+        )
+
+        row = query_job.result()
+
+        return "Question answered"
+
 
 @app.route("/listprogress/<patient_id>")
 def get_progress(patient_id):
@@ -214,7 +309,7 @@ def upload_media_form(iduser):
 
     if not user_exists(iduser):
         return "User not found", 404
-    
+
     upload_url = blobstore.create_upload_url(f"/mediauploaded_treatment/{iduser}")
 
     response = """
@@ -243,11 +338,11 @@ def user_exists(iduser):
 def upload_media_treatment(iduser):
     """Endpoint que recebe o upload do ficheiro"""
     return MediaUploadHandler().post(iduser)
-    
+
 class MediaUploadHandler(blobstore.BlobstoreUploadHandler):
     def post(self, iduser):
         """Handles file upload and stores blob key in BigQuery."""
-        upload = self.get_uploads(request.environ)[0]  
+        upload = self.get_uploads(request.environ)[0]
         media = UserMedia(blob_key=upload.key(), iduser=iduser)
         media.put()
 
@@ -260,7 +355,7 @@ def view_user_files(iduser, blob_key):
 
 class MediaDownloadHandler(blobstore.BlobstoreDownloadHandler):
     def __init__(self, iduser):
-        self.iduser = iduser 
+        self.iduser = iduser
 
     def get(self, media_key): #todo
         if not blobstore.get(media_key):
@@ -271,7 +366,7 @@ class MediaDownloadHandler(blobstore.BlobstoreDownloadHandler):
             # Prevent Flask from setting a default content-type.
             # GAE sets it to a guessed type if the header is not set.
             headers["Content-Type"] = None
-            return "", headers 
+            return "", headers
 
 @app.route("/list_media")
 def list_media():
@@ -280,7 +375,7 @@ def list_media():
 
     if not media:
         return "Nenhuma media encontrada."
-    
+
     media_urls = [f"/usermedia/{item.iduser}/{item.blob_key}" for item in media]
     media_count = len(media)
 
@@ -304,10 +399,10 @@ def list_media():
 
     response += """
         </ul>
-        <p><a href="/mediauploadform/12">Return to upload form</a></p> 
+        <p><a href="/mediauploadform/12">Return to upload form</a></p>
         </body></html>
     """#testar
-    
+
     return response
 
 @app.route("/help")
