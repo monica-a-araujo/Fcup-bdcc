@@ -405,6 +405,209 @@ def list_media():
 
     return response
 
+# Helper function to convert BigQuery row to dictionary
+def row_to_dict(row):
+    return dict(row)
+
+@app.route("/rest/admissions", methods=["GET", "POST", "PUT"])
+def admissions():
+    if request.method == "GET":
+        # Handle GET request to retrieve admissions
+        try:
+            # Check if the request is for all admissions or filtered
+            if "all" in request.args:
+                # Retrieve all admissions
+                query = """
+                SELECT ROW_ID, HADM_ID, SUBJECT_ID, ADMITTIME, DISCHTIME, STATUS
+                FROM `project-bdcc.MIMIC.ADMISSIONS`
+                """
+            else:
+                # Retrieve filtered admissions
+                subject_id = request.args.get("SUBJECT_ID")
+                status = request.args.get("STATUS")
+
+                query = """
+                SELECT ROW_ID, HADM_ID, SUBJECT_ID, ADMITTIME, DISCHTIME, STATUS
+                FROM `project-bdcc.MIMIC.ADMISSIONS`
+                """
+                conditions = []
+                if subject_id:
+                    conditions.append("SUBJECT_ID = %d" % int(subject_id))
+                if status:
+                    conditions.append("STATUS = '%s'" % status)
+
+                if conditions:
+                    query += " WHERE " + " AND ".join(conditions)
+
+            query_job = bigquery_client.query(query)
+            rows = query_job.result()
+
+            # Convert rows to a list of dictionaries
+            admissions = [row_to_dict(row) for row in rows]
+
+            return jsonify(admissions), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    elif request.method == "POST":
+        # Handle POST request to create a new admission
+        try:
+            # Get JSON data from request
+            data = request.json
+
+            # Insert data into BigQuery
+            query = """
+            INSERT INTO `project-bdcc.MIMIC.ADMISSIONS` (
+                SUBJECT_ID, ADMITTIME, DISCHTIME, DEATHTIME, ADMISSION_TYPE, ADMISSION_LOCATION,
+                DISCHARGE_LOCATION, INSURANCE, LANGUAGE, RELIGION, MARITAL_STATUS, ETHNICITY,
+                EDREGTIME, EDOUTTIME, DIAGNOSIS, HOSPITAL_EXPIRE_FLAG, HAS_CHARTEVENTS_DATA, STATUS
+            )
+            VALUES (%d, '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', %d, %d, '%s')
+            """ % (
+                data.get("SUBJECT_ID"), data.get("ADMITTIME"), data.get("DISCHTIME"), data.get("DEATHTIME"),
+                data.get("ADMISSION_TYPE"), data.get("ADMISSION_LOCATION"), data.get("DISCHARGE_LOCATION"),
+                data.get("INSURANCE"), data.get("LANGUAGE"), data.get("RELIGION"), data.get("MARITAL_STATUS"),
+                data.get("ETHNICITY"), data.get("EDREGTIME"), data.get("EDOUTTIME"), data.get("DIAGNOSIS"),
+                data.get("HOSPITAL_EXPIRE_FLAG"), data.get("HAS_CHARTEVENTS_DATA"), data.get("STATUS")
+            )
+
+            query_job = bigquery_client.query(query)
+            query_job.result()  # Wait for the query to complete
+
+            return jsonify({"message": "Admission created successfully"}), 201
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    elif request.method == "PUT":
+        # Handle PUT request to update an admission
+        try:
+            hadm_id = request.args.get('HADM_ID', type=int)
+            data = request.json
+
+            # Build the update query dynamically based on provided fields
+            update_fields = []
+            for key, value in data.items():
+                if isinstance(value, str):
+                    update_fields.append(f"{key} = '{value}'")
+                else:
+                    update_fields.append(f"{key} = {value}")
+
+            query = """
+            UPDATE `project-bdcc.MIMIC.ADMISSIONS`
+            SET %s
+            WHERE HADM_ID = %d
+            """ % (", ".join(update_fields), hadm_id)
+
+            query_job = bigquery_client.query(query)
+            query_job.result()  # Wait for the query to complete
+
+            return jsonify({"message": "Admission updated successfully"}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500    
+
+@app.route("/rest/progress", methods=["GET", "POST", "PUT"])
+def progress():
+    if request.method == "GET":
+        # Handle GET request to retrieve progress entries
+        try:
+            # Check if the request is for all progress entries or filtered
+            if "all" in request.args:
+                # Retrieve all progress entries
+                query = """
+                SELECT PROGRESS_ID, HADM_ID, SUBJECT_ID, EVENT_TYPE, EVENT_DATETIME, DESCRIPTION, VALUE, VALUE_NUM, VALUE_UOM, STATUS, CREATED_AT
+                FROM `project-bdcc.MIMIC.Progress`
+                """
+            else:
+                # Retrieve filtered progress entries
+                hadm_id = request.args.get("HADM_ID")
+                subject_id = request.args.get("SUBJECT_ID")
+
+                query = """
+                SELECT PROGRESS_ID, HADM_ID, SUBJECT_ID, EVENT_TYPE, EVENT_DATETIME, DESCRIPTION, VALUE, VALUE_NUM, VALUE_UOM, STATUS, CREATED_AT
+                FROM `project-bdcc.MIMIC.Progress`
+                """
+                conditions = []
+                if hadm_id:
+                    conditions.append("HADM_ID = %d" % int(hadm_id))
+                if subject_id:
+                    conditions.append("SUBJECT_ID = %d" % int(subject_id))
+
+                if conditions:
+                    query += " WHERE " + " AND ".join(conditions)
+
+            query_job = bigquery_client.query(query)
+            rows = query_job.result()
+
+            # Convert rows to a list of dictionaries
+            progress_entries = [row_to_dict(row) for row in rows]
+
+            return jsonify(progress_entries), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    elif request.method == "POST":
+        # Handle POST request to create a new progress entry
+        try:
+            # Get JSON data from request
+            data = request.json
+
+            # Query the maximum PROGRESS_ID and increment it by 1
+            query_max_id = """
+            SELECT MAX(PROGRESS_ID) as max_id
+            FROM `project-bdcc.MIMIC.Progress`
+            """
+            query_job = bigquery_client.query(query_max_id)
+            result = query_job.result()
+            row = next(result, None)  # Get the first row or None if no rows exist
+            max_id = row["max_id"] if row and row["max_id"] is not None else 0  # Default to 0 if no rows exist
+            progress_id = max_id + 1
+
+            # Insert data into BigQuery
+            query = """
+            INSERT INTO `project-bdcc.MIMIC.Progress` (
+                PROGRESS_ID, HADM_ID, SUBJECT_ID, EVENT_TYPE, EVENT_DATETIME, DESCRIPTION, VALUE, VALUE_NUM, VALUE_UOM, STATUS, CREATED_AT
+            )
+            VALUES (%d, %d, %d, '%s', '%s', '%s', '%s', %f, '%s', '%s', CURRENT_TIMESTAMP())
+            """ % (
+                progress_id, data.get("HADM_ID"), data.get("SUBJECT_ID"), data.get("EVENT_TYPE"),
+                data.get("EVENT_DATETIME"), data.get("DESCRIPTION"), data.get("VALUE"),
+                data.get("VALUE_NUM"), data.get("VALUE_UOM"), data.get("STATUS")
+            )
+
+            query_job = bigquery_client.query(query)
+            query_job.result()  # Wait for the query to complete
+
+            return jsonify({"message": "Progress entry created successfully", "PROGRESS_ID": progress_id}), 201
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    elif request.method == "PUT":
+        # Handle PUT request to update a progress entry
+        try:
+            progress_id = request.args.get('PROGRESS_ID', type=int)
+            data = request.json
+
+            # Build the update query dynamically based on provided fields
+            update_fields = []
+            for key, value in data.items():
+                if isinstance(value, str):
+                    update_fields.append(f"{key} = '{value}'")
+                else:
+                    update_fields.append(f"{key} = {value}")
+
+            query = """
+            UPDATE `project-bdcc.MIMIC.Progress`
+            SET %s
+            WHERE PROGRESS_ID = %d
+            """ % (", ".join(update_fields), progress_id)
+
+            query_job = bigquery_client.query(query)
+            query_job.result()  # Wait for the query to complete
+
+            return jsonify({"message": "Progress entry updated successfully"}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
 @app.route("/help")
 def help_page():
     """Página de ajuda com links rápidos e input para ID do utilizador."""
