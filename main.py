@@ -405,6 +405,7 @@ def list_media():
 
     return response
 
+
 # Helper function to convert BigQuery row to dictionary
 def row_to_dict(row):
     return dict(row)
@@ -414,37 +415,50 @@ def admissions():
     if request.method == "GET":
         # Handle GET request to retrieve admissions
         try:
-            # Check if the request is for all admissions or filtered
-            if "all" in request.args:
-                # Retrieve all admissions
-                query = """
-                SELECT ROW_ID, HADM_ID, SUBJECT_ID, ADMITTIME, DISCHTIME, STATUS
-                FROM `project-bdcc.MIMIC.ADMISSIONS`
-                """
-            else:
-                # Retrieve filtered admissions
-                subject_id = request.args.get("SUBJECT_ID")
-                status = request.args.get("STATUS")
+            query = """
+            SELECT ROW_ID, HADM_ID, SUBJECT_ID, ADMITTIME, DISCHTIME, STATUS
+            FROM `project-bdcc.MIMIC.ADMISSIONS`
+            """
+            conditions = []
+            query_params = []
 
-                query = """
-                SELECT ROW_ID, HADM_ID, SUBJECT_ID, ADMITTIME, DISCHTIME, STATUS
-                FROM `project-bdcc.MIMIC.ADMISSIONS`
-                """
-                conditions = []
-                if subject_id:
-                    conditions.append("SUBJECT_ID = %d" % int(subject_id))
-                if status:
-                    conditions.append("STATUS = '%s'" % status)
+            # Add filters based on query parameters
+            for key, value in request.args.items():
+                if key == "SUBJECT_ID":
+                    conditions.append("SUBJECT_ID = @subject_id")
+                    query_params.append(bigquery.ScalarQueryParameter("subject_id", "INT64", int(value)))
+                elif key == "STATUS":
+                    conditions.append("STATUS = @status")
+                    query_params.append(bigquery.ScalarQueryParameter("status", "STRING", value))
+                elif key == "HADM_ID":
+                    conditions.append("HADM_ID = @hadm_id")
+                    query_params.append(bigquery.ScalarQueryParameter("hadm_id", "INT64", value))
+                elif key == "ROW_ID":
+                    conditions.append("ROW_ID = @row_id")
+                    query_params.append(bigquery.ScalarQueryParameter("row_id", "INT64", value))
+                elif key == "ADMITTIME":
+                    conditions.append("ADMITTIME = @admittime")
+                    query_params.append(bigquery.ScalarQueryParameter("admittime", "INT64", value))
+                elif key == "DISCHTIME":
+                    conditions.append("DISCHTIME = @dishtime")
+                    query_params.append(bigquery.ScalarQueryParameter("dishtime", "INT64", value))
+                elif key == "all":
+                    continue  # Ignore "all" parameter
+                else:
+                    return jsonify({"error": f"Unsupported filter: {key}"}), 400
 
-                if conditions:
-                    query += " WHERE " + " AND ".join(conditions)
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
 
-            query_job = bigquery_client.query(query)
+            # Execute the query
+            job_config = bigquery.QueryJobConfig()
+            if query_params:
+                job_config.query_parameters = query_params
+            query_job = bigquery_client.query(query, job_config=job_config)
             rows = query_job.result()
 
             # Convert rows to a list of dictionaries
             admissions = [row_to_dict(row) for row in rows]
-
             return jsonify(admissions), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -452,26 +466,33 @@ def admissions():
     elif request.method == "POST":
         # Handle POST request to create a new admission
         try:
-            # Get JSON data from request
-            data = request.json
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "Request body is empty"}), 400
 
-            # Insert data into BigQuery
-            query = """
-            INSERT INTO `project-bdcc.MIMIC.ADMISSIONS` (
-                SUBJECT_ID, ADMITTIME, DISCHTIME, DEATHTIME, ADMISSION_TYPE, ADMISSION_LOCATION,
-                DISCHARGE_LOCATION, INSURANCE, LANGUAGE, RELIGION, MARITAL_STATUS, ETHNICITY,
-                EDREGTIME, EDOUTTIME, DIAGNOSIS, HOSPITAL_EXPIRE_FLAG, HAS_CHARTEVENTS_DATA, STATUS
-            )
-            VALUES (%d, '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', %d, %d, '%s')
-            """ % (
-                data.get("SUBJECT_ID"), data.get("ADMITTIME"), data.get("DISCHTIME"), data.get("DEATHTIME"),
-                data.get("ADMISSION_TYPE"), data.get("ADMISSION_LOCATION"), data.get("DISCHARGE_LOCATION"),
-                data.get("INSURANCE"), data.get("LANGUAGE"), data.get("RELIGION"), data.get("MARITAL_STATUS"),
-                data.get("ETHNICITY"), data.get("EDREGTIME"), data.get("EDOUTTIME"), data.get("DIAGNOSIS"),
-                data.get("HOSPITAL_EXPIRE_FLAG"), data.get("HAS_CHARTEVENTS_DATA"), data.get("STATUS")
-            )
+            # Build the INSERT query dynamically
+            columns = []
+            values = []
+            query_params = []
+            for key, value in data.items():
+                columns.append(key)
+                values.append(f"@{key}")
+                if isinstance(value, int):
+                    query_params.append(bigquery.ScalarQueryParameter(key, "INT64", value))
+                elif isinstance(value, str):
+                    query_params.append(bigquery.ScalarQueryParameter(key, "STRING", value))
+                else:
+                    return jsonify({"error": f"Unsupported data type for column: {key}"}), 400
 
-            query_job = bigquery_client.query(query)
+            query = f"""
+            INSERT INTO `project-bdcc.MIMIC.ADMISSIONS` ({', '.join(columns)})
+            VALUES ({', '.join(values)})
+            """
+
+            # Execute the query
+            job_config = bigquery.QueryJobConfig()
+            job_config.query_parameters = query_params
+            query_job = bigquery_client.query(query, job_config=job_config)
             query_job.result()  # Wait for the query to complete
 
             return jsonify({"message": "Admission created successfully"}), 201
@@ -482,74 +503,107 @@ def admissions():
         # Handle PUT request to update an admission
         try:
             hadm_id = request.args.get('HADM_ID', type=int)
-            data = request.json
+            if not hadm_id:
+                return jsonify({"error": "HADM_ID is required"}), 400
 
-            # Build the update query dynamically based on provided fields
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "Request body is empty"}), 400
+
+            # Build the UPDATE query dynamically
             update_fields = []
+            query_params = []
             for key, value in data.items():
-                if isinstance(value, str):
-                    update_fields.append(f"{key} = '{value}'")
+                update_fields.append(f"{key} = @{key}")
+                if isinstance(value, int):
+                    query_params.append(bigquery.ScalarQueryParameter(key, "INT64", value))
+                elif isinstance(value, str):
+                    query_params.append(bigquery.ScalarQueryParameter(key, "STRING", value))
                 else:
-                    update_fields.append(f"{key} = {value}")
+                    return jsonify({"error": f"Unsupported data type for column: {key}"}), 400
 
-            query = """
+            query = f"""
             UPDATE `project-bdcc.MIMIC.ADMISSIONS`
-            SET %s
-            WHERE HADM_ID = %d
-            """ % (", ".join(update_fields), hadm_id)
+            SET {', '.join(update_fields)}
+            WHERE HADM_ID = @hadm_id
+            """
+            query_params.append(bigquery.ScalarQueryParameter("hadm_id", "INT64", hadm_id))
 
-            query_job = bigquery_client.query(query)
+            # Execute the query
+            job_config = bigquery.QueryJobConfig()
+            job_config.query_parameters = query_params
+            query_job = bigquery_client.query(query, job_config=job_config)
             query_job.result()  # Wait for the query to complete
 
             return jsonify({"message": "Admission updated successfully"}), 200
         except Exception as e:
-            return jsonify({"error": str(e)}), 500    
+            return jsonify({"error": str(e)}), 500
 
 @app.route("/rest/progress", methods=["GET", "POST", "PUT"])
 def progress():
     if request.method == "GET":
         # Handle GET request to retrieve progress entries
         try:
-            # Check if the request is for all progress entries or filtered
-            if "all" in request.args:
-                # Retrieve all progress entries
-                query = """
-                SELECT PROGRESS_ID, HADM_ID, SUBJECT_ID, EVENT_TYPE, EVENT_DATETIME, DESCRIPTION, VALUE, VALUE_NUM, VALUE_UOM, STATUS, CREATED_AT
-                FROM `project-bdcc.MIMIC.Progress`
-                """
-            else:
-                # Retrieve filtered progress entries
-                hadm_id = request.args.get("HADM_ID")
-                subject_id = request.args.get("SUBJECT_ID")
+            query = """
+            SELECT PROGRESS_ID, HADM_ID, SUBJECT_ID, EVENT_TYPE, EVENT_DATETIME, DESCRIPTION, VALUE, VALUE_NUM, VALUE_UOM, STATUS, CREATED_AT
+            FROM `project-bdcc.MIMIC.Progress`
+            """
+            conditions = []
+            query_params = []
 
-                query = """
-                SELECT PROGRESS_ID, HADM_ID, SUBJECT_ID, EVENT_TYPE, EVENT_DATETIME, DESCRIPTION, VALUE, VALUE_NUM, VALUE_UOM, STATUS, CREATED_AT
-                FROM `project-bdcc.MIMIC.Progress`
-                """
-                conditions = []
-                if hadm_id:
-                    conditions.append("HADM_ID = %d" % int(hadm_id))
-                if subject_id:
-                    conditions.append("SUBJECT_ID = %d" % int(subject_id))
+            # Add filters based on query parameters
+            for key, value in request.args.items():
+                if key == "SUBJECT_ID":
+                    conditions.append("SUBJECT_ID = @subject_id")
+                    query_params.append(bigquery.ScalarQueryParameter("subject_id", "INT64", int(value)))
+                elif key == "STATUS":
+                    conditions.append("STATUS = @status")
+                    query_params.append(bigquery.ScalarQueryParameter("status", "STRING", value))
+                elif key == "HADM_ID":
+                    conditions.append("HADM_ID = @hadm_id")
+                    query_params.append(bigquery.ScalarQueryParameter("hadm_id", "INT64", value))
+                elif key == "PROGRESS_ID":
+                    conditions.append("PROGRESS_ID = @progress_id")
+                    query_params.append(bigquery.ScalarQueryParameter("progress_id", "INT64", value))
+                elif key == "EVENT_TYPE":
+                    conditions.append("EVENT_TYPE = @event_type")
+                    query_params.append(bigquery.ScalarQueryParameter("event_type", "STRING", value))
+                elif key == "EVENT_DATETIME":
+                    conditions.append("EVENT_DATETIME = @event_datetime")
+                    query_params.append(bigquery.ScalarQueryParameter("event_datetime", "STRING", value))
+                elif key == "DESCRIPTION":
+                    conditions.append("DESCRIPTION = @description")
+                    query_params.append(bigquery.ScalarQueryParameter("description", "STRING", value))
+                elif key == "VALUE":
+                    conditions.append("VALUE = @value")
+                    query_params.append(bigquery.ScalarQueryParameter("value", "STRING", value))
+                elif key == "all":
+                    continue  # Ignore "all" parameter
+                else:
+                    return jsonify({"error": f"Unsupported filter: {key}"}), 400
 
-                if conditions:
-                    query += " WHERE " + " AND ".join(conditions)
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
 
-            query_job = bigquery_client.query(query)
+            # Execute the query
+            job_config = bigquery.QueryJobConfig()
+            if query_params:
+                job_config.query_parameters = query_params
+            query_job = bigquery_client.query(query, job_config=job_config)
             rows = query_job.result()
 
             # Convert rows to a list of dictionaries
-            progress_entries = [row_to_dict(row) for row in rows]
-
-            return jsonify(progress_entries), 200
+            progress = [row_to_dict(row) for row in rows]
+            return jsonify(progress), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
     elif request.method == "POST":
         # Handle POST request to create a new progress entry
         try:
-            # Get JSON data from request
-            data = request.json
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "Request body is empty"}), 400
 
             # Query the maximum PROGRESS_ID and increment it by 1
             query_max_id = """
@@ -562,19 +616,32 @@ def progress():
             max_id = row["max_id"] if row and row["max_id"] is not None else 0  # Default to 0 if no rows exist
             progress_id = max_id + 1
 
-            # Insert data into BigQuery
-            query = """
-            INSERT INTO `project-bdcc.MIMIC.Progress` (
-                PROGRESS_ID, HADM_ID, SUBJECT_ID, EVENT_TYPE, EVENT_DATETIME, DESCRIPTION, VALUE, VALUE_NUM, VALUE_UOM, STATUS, CREATED_AT
-            )
-            VALUES (%d, %d, %d, '%s', '%s', '%s', '%s', %f, '%s', '%s', CURRENT_TIMESTAMP())
-            """ % (
-                progress_id, data.get("HADM_ID"), data.get("SUBJECT_ID"), data.get("EVENT_TYPE"),
-                data.get("EVENT_DATETIME"), data.get("DESCRIPTION"), data.get("VALUE"),
-                data.get("VALUE_NUM"), data.get("VALUE_UOM"), data.get("STATUS")
-            )
+            # Build the INSERT query dynamically
+            columns = ["PROGRESS_ID"]  # Add PROGRESS_ID as the first column
+            values = [f"@progress_id"]  # Add PROGRESS_ID as the first value
+            query_params = [bigquery.ScalarQueryParameter("progress_id", "INT64", progress_id)]
 
-            query_job = bigquery_client.query(query)
+            for key, value in data.items():
+                columns.append(key)
+                values.append(f"@{key}")
+                if isinstance(value, int):
+                    query_params.append(bigquery.ScalarQueryParameter(key, "INT64", value))
+                elif isinstance(value, str):
+                    query_params.append(bigquery.ScalarQueryParameter(key, "STRING", value))
+                elif isinstance(value, float):
+                    query_params.append(bigquery.ScalarQueryParameter(key, "FLOAT64", value))
+                else:
+                    return jsonify({"error": f"Unsupported data type for column: {key}"}), 400
+
+            query = f"""
+            INSERT INTO `project-bdcc.MIMIC.Progress` ({', '.join(columns)})
+            VALUES ({', '.join(values)})
+            """
+
+            # Execute the query
+            job_config = bigquery.QueryJobConfig()
+            job_config.query_parameters = query_params
+            query_job = bigquery_client.query(query, job_config=job_config)
             query_job.result()  # Wait for the query to complete
 
             return jsonify({"message": "Progress entry created successfully", "PROGRESS_ID": progress_id}), 201
@@ -585,29 +652,44 @@ def progress():
         # Handle PUT request to update a progress entry
         try:
             progress_id = request.args.get('PROGRESS_ID', type=int)
-            data = request.json
+            if not progress_id:
+                return jsonify({"error": "PROGRESS_ID is required"}), 400
 
-            # Build the update query dynamically based on provided fields
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "Request body is empty"}), 400
+
+            # Build the UPDATE query dynamically
             update_fields = []
+            query_params = []
             for key, value in data.items():
-                if isinstance(value, str):
-                    update_fields.append(f"{key} = '{value}'")
+                update_fields.append(f"{key} = @{key}")
+                if isinstance(value, int):
+                    query_params.append(bigquery.ScalarQueryParameter(key, "INT64", value))
+                elif isinstance(value, str):
+                    query_params.append(bigquery.ScalarQueryParameter(key, "STRING", value))
+                elif isinstance(value, float):
+                    query_params.append(bigquery.ScalarQueryParameter(key, "FLOAT64", value))
                 else:
-                    update_fields.append(f"{key} = {value}")
+                    return jsonify({"error": f"Unsupported data type for column: {key}"}), 400
 
-            query = """
+            query = f"""
             UPDATE `project-bdcc.MIMIC.Progress`
-            SET %s
-            WHERE PROGRESS_ID = %d
-            """ % (", ".join(update_fields), progress_id)
+            SET {', '.join(update_fields)}
+            WHERE PROGRESS_ID = @progress_id
+            """
+            query_params.append(bigquery.ScalarQueryParameter("progress_id", "INT64", progress_id))
 
-            query_job = bigquery_client.query(query)
+            # Execute the query
+            job_config = bigquery.QueryJobConfig()
+            job_config.query_parameters = query_params
+            query_job = bigquery_client.query(query, job_config=job_config)
             query_job.result()  # Wait for the query to complete
 
             return jsonify({"message": "Progress entry updated successfully"}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-
+        
 @app.route("/help")
 def help_page():
     """Página de ajuda com links rápidos e input para ID do utilizador."""
