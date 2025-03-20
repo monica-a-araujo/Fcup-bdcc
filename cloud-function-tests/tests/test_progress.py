@@ -39,11 +39,11 @@ class TestProgressEndpoint(unittest.TestCase):
 
     def test_filter_by_event_datetime(self):
         """Test filtering by EVENT_DATETIME."""
-        response = requests.get(f"{BASE_URL}/rest/progress?EVENT_DATETIME=2100-01-01")
+        response = requests.get(f"{BASE_URL}/rest/progress?EVENT_DATETIME=2023-10-01%2012:00:00%20UTC")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         for progress in data:
-            self.assertEqual(progress["EVENT_DATETIME"], "2100-01-01")
+            self.assertEqual(progress["EVENT_DATETIME"], "2023-10-01%2012:00:00%20UTC")
 
     def test_filter_by_status(self):
         """Test filtering by STATUS."""
@@ -61,3 +61,6 @@ class TestProgressEndpoint(unittest.TestCase):
         for progress in data:
             self.assertEqual(progress["SUBJECT_ID"], 10006)
             self.assertEqual(progress["STATUS"], "COMPLETED")
+
+if __name__ == "__main__":
+    unittest.main()

@@ -413,7 +413,6 @@ def row_to_dict(row):
 @app.route("/rest/admissions", methods=["GET", "POST", "PUT"])
 def admissions():
     if request.method == "GET":
-        # Handle GET request to retrieve admissions
         try:
             query = """
             SELECT ROW_ID, HADM_ID, SUBJECT_ID, ADMITTIME, DISCHTIME, STATUS
@@ -433,15 +432,12 @@ def admissions():
                 elif key == "HADM_ID":
                     conditions.append("HADM_ID = @hadm_id")
                     query_params.append(bigquery.ScalarQueryParameter("hadm_id", "INT64", value))
-                elif key == "ROW_ID":
-                    conditions.append("ROW_ID = @row_id")
-                    query_params.append(bigquery.ScalarQueryParameter("row_id", "INT64", value))
                 elif key == "ADMITTIME":
                     conditions.append("ADMITTIME = @admittime")
-                    query_params.append(bigquery.ScalarQueryParameter("admittime", "INT64", value))
+                    query_params.append(bigquery.ScalarQueryParameter("admittime", "TIMESTAMP", value))
                 elif key == "DISCHTIME":
-                    conditions.append("DISCHTIME = @dishtime")
-                    query_params.append(bigquery.ScalarQueryParameter("dishtime", "INT64", value))
+                    conditions.append("DISCHTIME = @dischtime")
+                    query_params.append(bigquery.ScalarQueryParameter("dischtime", "TIMESTAMP", value))
                 elif key == "all":
                     continue  # Ignore "all" parameter
                 else:
@@ -570,13 +566,16 @@ def progress():
                     query_params.append(bigquery.ScalarQueryParameter("event_type", "STRING", value))
                 elif key == "EVENT_DATETIME":
                     conditions.append("EVENT_DATETIME = @event_datetime")
-                    query_params.append(bigquery.ScalarQueryParameter("event_datetime", "STRING", value))
+                    query_params.append(bigquery.ScalarQueryParameter("event_datetime", "TIMESTAMP", value))
                 elif key == "DESCRIPTION":
                     conditions.append("DESCRIPTION = @description")
                     query_params.append(bigquery.ScalarQueryParameter("description", "STRING", value))
                 elif key == "VALUE":
                     conditions.append("VALUE = @value")
                     query_params.append(bigquery.ScalarQueryParameter("value", "STRING", value))
+                elif key == "CREATED_AT":
+                    conditions.append("CREATED_AT = @created_at")
+                    query_params.append(bigquery.ScalarQueryParameter("created_at", "TIMESTAMP", value))
                 elif key == "all":
                     continue  # Ignore "all" parameter
                 else:
