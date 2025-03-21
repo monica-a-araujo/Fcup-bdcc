@@ -2,14 +2,12 @@ import concurrent.futures
 
 from flask import Flask, jsonify, request, redirect
 from google.cloud import bigquery
-from google.appengine.ext import blobstore
-from google.appengine.ext import ndb
+from google.appengine.ext import blobstore, ndb
 from google.appengine.api import wrap_wsgi_app
 
 app = Flask(__name__)
 bigquery_client = bigquery.Client()
 app.wsgi_app = wrap_wsgi_app(app.wsgi_app, use_deferred=True)
-
 
 
 @app.route("/")
@@ -29,6 +27,7 @@ def querylimits():
 
     return jsonify(data)
 
+# Endpoints that deals with CRUD operations on Users
 @app.route("/rest/user", methods=["GET","POST", "PUT","DELETE"])
 def user():
     # Get information of a patient
@@ -44,14 +43,14 @@ def user():
         )
         rows = query_job.result()
         if (rows.total_rows != 1):
-            return "Patient doesnt exist"
+            return "Patient doesn't exist"
 
         row = next(rows.__iter__())
         data = {"subject_id":row["SUBJECT_ID"], "gender":row["GENDER"],"dob":row["DOB"],"dod":row["DOD"]}
 
         return jsonify(data)
 
-    # Insert a new patient into system
+    # Insert a new patient into system. Can add the columns that want to insert like GENDER or DOB in multipart form.
     elif request.method == "POST":
 
         insert_data = request.form
@@ -64,12 +63,11 @@ def user():
             FROM `project-bdcc.MIMIC.PATIENTS`
             """
         )
-
         rows = query_job.result()
 
-        row = next(rows.__iter__())
-        row_id = row["R"] + 1
-        subject_id = row["S"] + 1
+        row = next(rows.__iter__(),None)
+        row_id = row["R"] + 1 if row is not None else 0
+        subject_id = row["S"] + 1 if row is not None else 0
 
         query_job = bigquery_client.query(
             """
@@ -81,20 +79,12 @@ def user():
 
         return "Patient added with subject_id:%d" % subject_id
 
-
-    # Update current patient's information
+    # Update current patient's information. Columns and the respective values to update given in multipart form.
     elif request.method== "PUT":
         patient_id = request.args.get('patient_id',type=int)
-        query_job = bigquery_client.query(
-            """
-            SELECT *
-            FROM `project-bdcc.MIMIC.PATIENTS`
-            WHERE SUBJECT_ID=%d
-            """ % patient_id
-        )
-        rows = query_job.result()
-        if (rows.total_rows != 1):
-            return "Patient doesnt exist"
+
+        if (not user_exists(patient_id)):
+            return "Patient %s doesn't exist" % patient_id
 
         update_data = request.form
         update_values = ""
@@ -112,19 +102,12 @@ def user():
         rows = query_job.result()
         return "Patient updated"
 
-    # Delete patient
+    # Delete patient. Update the admissions, labevents and inputevents to Default user which is -1.
     elif request.method == "DELETE":
         patient_id = request.args.get('patient_id', type=int)
-        query_job = bigquery_client.query(
-            """
-            SELECT *
-            FROM `project-bdcc.MIMIC.PATIENTS`
-            WHERE SUBJECT_ID=%d
-            """ % patient_id
-        )
-        rows = query_job.result()
-        if (rows.total_rows != 1):
-            return "Patient doesnt exist"
+
+        if (not user_exists(patient_id)):
+            return "Patient %s doesn't exist" % patient_id
 
         query_job = bigquery_client.query(
             """
@@ -140,54 +123,7 @@ def user():
         query_job.result()
         return "Patiend %d deleted" % patient_id
 
-@app.route("/rest/patients/<patient_id>/question",methods=["GET","PUT"])
-def handle_questions(patient_id):
-    # Falta verificar se user existe
-    if request.method == "GET":
-        query_job = bigquery_client.query(
-            """
-            SELECT *
-            FROM `project-bdcc.MIMIC.Questions`
-            WHERE PATIENT_ID=%s
-            ORDER BY TIME_QUESTION ASC
-            """ % patient_id
-        )
-        rows = query_job.result()
-        questions = []
-
-        for row in rows:
-            q = {"question_id":row["QUESTION_ID"],"question":row["QUESTION"],"cgid":row["CGID"],"answer":row["ANSWER"],"time_question":row["TIME_QUESTION"],"time_answer":row["TIME_ANSWER"],"done":row["DONE"]}
-            questions.append(q)
-
-        return jsonify(questions)
-
-    # Falta verificar se user existe e se cgid dado e valido
-    elif request.method == "PUT":
-        question_data = request.form
-
-        query_job = bigquery_client.query(
-            """
-            SELECT MAX(QUESTION_ID) as MAX
-            FROM `project-bdcc.MIMIC.Questions`
-            """
-        )
-        rows = query_job.result()
-        row = next(rows.__iter__())
-        if (row["MAX"] == None):
-            question_id = 0
-        else:
-            question_id = row["MAX"] + 1
-
-        query_job = bigquery_client.query(
-            """
-            INSERT INTO `project-bdcc.MIMIC.Questions` (QUESTION_ID,PATIENT_ID,QUESTION,CGID,DONE,TIME_QUESTION)
-            VALUES (%d,%s,%s,%s,FALSE,CURRENT_TIMESTAMP)
-            """ % (question_id,patient_id,question_data["QUESTION"],question_data["CGID"])
-        )
-        query_job.result()
-        return "Question added"
-
-@app.route("/rest/patients/<patient_id>/getpossiblecgid",methods=["GET"])
+# Get the caregivers that treated the patient and can answer their questions
 def get_possible_cgids(patient_id):
     query_job = bigquery_client.query(
         """
@@ -200,9 +136,68 @@ def get_possible_cgids(patient_id):
     rows = query_job.result()
     cgids = sorted([row["CGID"] for row in rows])
 
-    return jsonify(cgids)
+    return cgids
 
-@app.route("/rest/caregivers/<cgid>/question",methods=["GET","POST"])
+# This endpoint allows patients to see their questions and create new ones
+@app.route("/rest/patients/<patient_id>/question",methods=["GET","POST"])
+def handle_questions(patient_id):
+    # Get list of questions ordered by their creation time
+    if request.method == "GET":
+        if (not user_exists(patient_id)):
+            return "Patient %s doesn't exist" % patient_id
+
+        query_job = bigquery_client.query(
+            """
+            SELECT *
+            FROM `project-bdcc.MIMIC.Questions`
+            WHERE PATIENT_ID=%s
+            ORDER BY TIME_QUESTION ASC
+            """ % patient_id
+        )
+        rows = query_job.result()
+
+        questions = []
+        for row in rows:
+            q = {"question_id":row["QUESTION_ID"],"question":row["QUESTION"],"cgid":row["CGID"],"answer":row["ANSWER"],"time_question":row["TIME_QUESTION"],"time_answer":row["TIME_ANSWER"],"done":row["DONE"]}
+            questions.append(q)
+
+        return jsonify(questions)
+
+    # Place a new question. This question can only be answered by a caregiver that treated this patient.
+    # Only requires param QUESTION:String and CGID:String in multipart form
+    elif request.method == "POST":
+        question_data = request.form
+
+        if (not user_exists(patient_id)):
+            return "Patient %s doesn't exist" % patient_id
+
+        # Test if cgid is valid, if not return the possible ones to use
+        possible_cgids = get_possible_cgids(patient_id)
+        if int(question_data["CGID"]) not in possible_cgids:
+            return "Caregiver id:%s not valid. Please use one of the following: %s" % (question_data["CGID"],str(possible_cgids))
+
+        # Get question_id to use for next question since big_query doesn't support auto increment
+        query_job = bigquery_client.query(
+            """
+            SELECT MAX(QUESTION_ID) as MAX
+            FROM `project-bdcc.MIMIC.Questions`
+            """
+        )
+        rows = query_job.result()
+        row = next(rows.__iter__())
+        question_id = row["MAX"] + 1 if row is not None else 0
+
+        query_job = bigquery_client.query(
+            """
+            INSERT INTO `project-bdcc.MIMIC.Questions` (QUESTION_ID,PATIENT_ID,QUESTION,CGID,DONE,TIME_QUESTION)
+            VALUES (%d,%s,"%s",%s,FALSE,CURRENT_TIMESTAMP)
+            """ % (question_id,patient_id,question_data["QUESTION"],question_data["CGID"])
+        )
+        query_job.result()
+        return "Question added for patient %s" % patient_id
+
+#Endpoint that allows caregivers to see the patients questions and answer to them
+@app.route("/rest/caregivers/<cgid>/question",methods=["GET","PUT"])
 def handle_caregivers(cgid):
     if request.method == "GET":
         query_job = bigquery_client.query(
@@ -210,6 +205,7 @@ def handle_caregivers(cgid):
             SELECT *
             FROM `project-bdcc.MIMIC.Questions`
             WHERE CGID=%s
+            ORDER BY QUESTION_ID
             """ % cgid
         )
         rows = query_job.result()
@@ -220,13 +216,33 @@ def handle_caregivers(cgid):
             questions.append(q)
 
         return jsonify(questions)
-    elif request.method == "POST":
+
+    # Answer to a question. This question can only be answered by a caregiver that treated this patient.
+    # Only requires param ANSWER:String and QUESTION_ID:String in multipart form
+    elif request.method == "PUT":
         answer_data = request.form
+
+        # Check if the cgid can answer the question
+        query_job = bigquery_client.query(
+            """
+            SELECT *
+            FROM `project-bdcc.MIMIC.Questions`
+            WHERE QUESTION_ID=%s
+            """ % answer_data["QUESTION_ID"]
+        )
+        rows = query_job.result()
+        row = next(rows.__iter__(),None)
+        if (row is None):
+            return "Question %s doesn't exist" % answer_data["QUESTION_ID"]
+        elif (row["DONE"] == True):
+            return "Question already answered"
+        elif (int(row["CGID"]) != int(cgid)):
+            return "Invalid cgid. CGID:%s is answering but should be CGID:%s" % (cgid,row["CGID"])
 
         query_job = bigquery_client.query(
             """
             UPDATE `project-bdcc.MIMIC.Questions`
-            SET ANSWER=%s, TIME_ANSWER=CURRENT_TIMESTAMP, DONE=TRUE
+            SET ANSWER="%s", TIME_ANSWER=CURRENT_TIMESTAMP, DONE=TRUE
             WHERE QUESTION_ID=%s
             """ % (answer_data["ANSWER"],answer_data["QUESTION_ID"])
         )
@@ -235,20 +251,12 @@ def handle_caregivers(cgid):
 
         return "Question answered"
 
-
+# Endpoints that gives the list of medical intervenction or tests
 @app.route("/listprogress/<patient_id>")
 def get_progress(patient_id):
-    query_job = bigquery_client.query(
-        """
-        SELECT *
-        FROM `project-bdcc.MIMIC.PATIENTS`
-        WHERE SUBJECT_ID=%s
-        """ % patient_id
-    )
 
-    rows = query_job.result()
-    if (rows.total_rows != 1):
-        return "Patient id doesn't exist"
+    if (not user_exists(patient_id)):
+        return "Patient %s doesn't exist" % patient_id
 
     query_jobLABEVENTS = bigquery_client.query(
         """
@@ -280,14 +288,29 @@ def get_progress(patient_id):
 
     return jsonify(data)
 
+# Endpoint for google function to trigger a update to the longest waiting times
+@app.route("/updatelongestwaitingtimes")
+def update_longestwaiting():
+    query_job = bigquery_client.query(
+        """
+        DELETE `project-bdcc.MIMIC.WaitingTimes` WHERE TRUE;
+        INSERT INTO `project-bdcc.MIMIC.WaitingTimes` SELECT SUBJECT_ID,DATE_DIFF(DISCHTIME, ADMITTIME, day) as TIMEPASSED
+        FROM `project-bdcc.MIMIC.ADMISSIONS`
+        ORDER BY 2 DESC
+        LIMIT 10
+        """
+    )
+    rows = query_job.result()
+    return "Updated Waiting times"
+
+# Endpoint that gives the 10 patients that waited the most. This endpoint doesn't run a query every time is it called but relies
+# on a information that is periodically updated by a google cloud function.
 @app.route("/longestwaitingtimes")
 def get_longestwaiting():
     query_job = bigquery_client.query(
         """
-        SELECT SUBJECT_ID,DATE_DIFF(DISCHTIME, ADMITTIME, day) as TIMEPASSED
-        FROM `project-bdcc.MIMIC.ADMISSIONS`
-        ORDER BY 2 DESC
-        LIMIT 10
+        SELECT * FROM `project-bdcc.MIMIC.WaitingTimes`
+        ORDER BY TIMEPASSED DESC
         """
     )
 
@@ -295,8 +318,6 @@ def get_longestwaiting():
     data = [ (row["SUBJECT_ID"],row["TIMEPASSED"]) for row in rows]
 
     return jsonify(data)
-
-# ----
 
 class UserMedia(ndb.Model):
     iduser = ndb.StringProperty()
@@ -688,7 +709,7 @@ def progress():
             return jsonify({"message": "Progress entry updated successfully"}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-        
+
 @app.route("/help")
 def help_page():
     """Página de ajuda com links rápidos e input para ID do utilizador."""
