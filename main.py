@@ -319,6 +319,8 @@ def get_longestwaiting():
 
     return jsonify(data)
 
+#---
+
 class UserMedia(ndb.Model):
     iduser = ndb.StringProperty()
     blob_key = ndb.BlobKeyProperty()
@@ -426,6 +428,47 @@ def list_media():
 
     return response
 
+@app.route("/list_media/<iduser>")
+def list_media(iduser):
+    """Verifica os dados guardados no Datastore."""
+    
+    if not user_exists(iduser):
+        return "User not found", 404
+
+    media = UserMedia.query(UserMedia.iduser == iduser).fetch()
+
+    if not media:
+        notfound = "Nenhuma media encontrada para o user {}.".format(iduser)
+        return notfound
+
+    media_urls = [f"/usermedia/{item.iduser}/{item.blob_key}" for item in media]
+    media_count = len(media)
+
+    response = """<html><body>
+        <h1>Media</h1>
+        <h2>{} media uploaded:</h2>
+        <ul>
+        """.format(media_count)
+
+    for index, item in enumerate(media):
+        response += """
+            <li>
+                <h3>File {}:</h3>
+                <p>- blob key: {}</p>
+                <p>- User id: {}</p>
+                <p>- Upload time: {}</p>
+                <a href="{}">Download</a>
+            </li>
+            <br>
+        """.format(index + 1, item.blob_key, item.iduser, item.upload_time, media_urls[index])
+
+    response += """
+        </ul>
+        <p><a href="/mediauploadform/12">Return to upload form</a></p>
+        </body></html>
+    """#testar
+
+    return response
 
 # Helper function to convert BigQuery row to dictionary
 def row_to_dict(row):
