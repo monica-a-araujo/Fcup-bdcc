@@ -429,7 +429,7 @@ def list_media():
     return response
 
 @app.route("/list_media/<iduser>")
-def list_media(iduser):
+def list_user_media(iduser):
     """Verifica os dados guardados no Datastore."""
     
     if not user_exists(iduser):
