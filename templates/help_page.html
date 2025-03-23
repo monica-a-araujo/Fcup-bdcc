@@ -1,0 +1,56 @@
+<html>
+    <head>
+        <title>Help Page</title>
+    </head>
+    <body>
+        <h1>Ajuda e Navegação</h1>
+        <p>Use os links abaixo para aceder rapidamente às funcionalidades do sistema:</p>
+        <ul>
+            <li><a href="/">Página de ajuda</a></li>
+            <li><a href="/list_media">/list_media</a></li>
+            <li><a href="/longestwaitingtimes">/longestwaitingtimes</a></li>
+            <li><a href="/list_media">/list_media</a></li>
+            <li><a href="/rest/admissions">/rest/admissions</a></li>
+            <li><a href="/rest/progress">/rest/progress</a></li>
+
+            <li><a href="/usermedia/iduser/blob_key">/usermedia/iduser/blob_key</a></li>
+        </ul>
+        <input type="number" id="user_id" placeholder="Introduza o ID do paciente">
+        <button onclick="updateLink()">Gerar Link</button>
+        <p><a id="upload_link" href="#">/mediaUploadform/....</a></p>
+        <p><a id="user_link" href="#">/rest/user?patient_id=...</a></p>
+        <p><a id="patients_question" href="#">/rest/patients/.../question</a></p>
+        <p><a id="caregivers_question" href="#">/rest/caregivers/.../question</a></p>
+        <p><a id="list_progress" href="#">/listprogress/...</a></p>
+        <p><a id="list_media_user" href="#">/list_media/...</a></p>
+
+
+
+        <script>
+            function updateLink() {
+                var userId = document.getElementById("user_id").value;
+                if (userId) {
+                    document.getElementById("upload_link").href = "/mediauploadform/" + userId;
+                    document.getElementById("upload_link").innerText = "/mediaUploadform/" + userId ;
+
+                    document.getElementById("user_link").href = "/rest/user?patient_id=" + userId;
+                    document.getElementById("user_link").innerText = "/rest/user?patient_id=" + userId;
+
+                    document.getElementById("patients_question").href = "/rest/patients/" + userId + "/question";
+                    document.getElementById("patients_question").innerText = "/rest/patients/" + userId + "/question";
+
+                    document.getElementById("caregivers_question").href = "/rest/caregivers/" + userId + "/question";
+                    document.getElementById("caregivers_question").innerText = "/rest/caregivers/" + userId + "/question";
+
+                    document.getElementById("list_progress").href = "/listprogress/" + userId;
+                    document.getElementById("list_progress").innerText = "/listprogress/" + userId;
+
+                    document.getElementById("list_media_user").href = "/list_media/" + userId;
+                    document.getElementById("list_media_user").innerText = "/list_media/" + userId;
+                } else {
+                    alert("Por favor, introduza um ID válido.");
+                }
+            }
+        </script>
+    </body>
+</html>
