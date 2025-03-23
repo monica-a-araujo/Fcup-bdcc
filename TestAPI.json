@@ -1,0 +1,659 @@
+{
+  "name": "TestAPI",
+  "version": "1",
+  "items": [
+    {
+      "type": "http",
+      "name": "ListProgress",
+      "filename": "ListProgress.bru",
+      "seq": 2,
+      "request": {
+        "url": "https://project-bdcc.ew.r.appspot.com/listprogress/-1",
+        "method": "GET",
+        "headers": [],
+        "params": [],
+        "body": {
+          "mode": "none",
+          "formUrlEncoded": [],
+          "multipartForm": [],
+          "file": []
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [],
+        "tests": "",
+        "docs": "",
+        "auth": {
+          "mode": "none"
+        }
+      }
+    },
+    {
+      "type": "http",
+      "name": "LongestWaitingTimes",
+      "filename": "LongestWaitingTimes.bru",
+      "seq": 3,
+      "request": {
+        "url": "https://project-bdcc.ew.r.appspot.com/longestwaitingtimes",
+        "method": "GET",
+        "headers": [],
+        "params": [],
+        "body": {
+          "mode": "none",
+          "formUrlEncoded": [],
+          "multipartForm": [],
+          "file": []
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [],
+        "tests": "",
+        "docs": "",
+        "auth": {
+          "mode": "none"
+        }
+      }
+    },
+    {
+      "type": "http",
+      "name": "Update LongestWaitingTimes",
+      "filename": "Update LongestWaitingTimes.bru",
+      "seq": 4,
+      "request": {
+        "url": "https://project-bdcc.ew.r.appspot.com/updatelongestwaitingtimes",
+        "method": "GET",
+        "headers": [],
+        "params": [],
+        "body": {
+          "mode": "none",
+          "formUrlEncoded": [],
+          "multipartForm": [],
+          "file": []
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [],
+        "tests": "",
+        "docs": "",
+        "auth": {
+          "mode": "none"
+        }
+      }
+    },
+    {
+      "type": "folder",
+      "name": "ADMISSIONS",
+      "filename": "ADMISSIONS",
+      "items": [
+        {
+          "type": "http",
+          "name": "Get admissions",
+          "filename": "Get admissions.bru",
+          "seq": 1,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/rest/admissions?SUBJECT_ID=28500",
+            "method": "GET",
+            "headers": [],
+            "params": [
+              {
+                "name": "SUBJECT_ID",
+                "value": "28500",
+                "type": "query",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "mode": "multipartForm",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "Update admissions",
+          "filename": "Update admissions.bru",
+          "seq": 2,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/rest/admissions?HADM_ID=138015",
+            "method": "PUT",
+            "headers": [],
+            "params": [
+              {
+                "name": "HADM_ID",
+                "value": "138015",
+                "type": "query",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": "{\"SUBJECT_ID\": 10007,\n\"ADMITTIME\": \"2023-10-02 12:00:00 UTC\",\n\"DISCHTIME\": \"2023-10-06 12:00:00 UTC\",\n\"STATUS\": \"inactive\"\n}",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "Insert new admission",
+          "filename": "Insert new admission.bru",
+          "seq": 3,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/rest/admissions",
+            "method": "POST",
+            "headers": [],
+            "params": [],
+            "body": {
+              "mode": "json",
+              "json": "{\n\"ROW_ID\":100000,\n\"HADM_ID\":250000,\n\"SUBJECT_ID\": 10007,\n\"ADMITTIME\": \"2023-10-02 12:00:00 UTC\",\n\"DISCHTIME\": \"2023-10-06 12:00:00 UTC\",\n\"STATUS\": \"inactive\"\n}",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "folder",
+      "name": "MEDIA",
+      "filename": "MEDIA",
+      "items": [
+        {
+          "type": "http",
+          "name": "List media",
+          "filename": "List media.bru",
+          "seq": 1,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/list_media",
+            "method": "GET",
+            "headers": [],
+            "params": [],
+            "body": {
+              "mode": "none",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "List media by user",
+          "filename": "List media by user.bru",
+          "seq": 2,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/list_media/123",
+            "method": "GET",
+            "headers": [],
+            "params": [],
+            "body": {
+              "mode": "none",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "folder",
+      "name": "PROGRESS",
+      "filename": "PROGRESS",
+      "items": [
+        {
+          "type": "http",
+          "name": "Get progress",
+          "filename": "Get progress.bru",
+          "seq": 1,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/rest/progress?SUBJECT_ID=3506",
+            "method": "GET",
+            "headers": [],
+            "params": [
+              {
+                "name": "SUBJECT_ID",
+                "value": "3506",
+                "type": "query",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "mode": "none",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "Insert new progress",
+          "filename": "Insert new progress.bru",
+          "seq": 2,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/rest/progress",
+            "method": "POST",
+            "headers": [],
+            "params": [],
+            "body": {
+              "mode": "json",
+              "json": "{\n  \"HADM_ID\":12,\n  \"SUBJECT_ID\":14\n}",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "Update progress",
+          "filename": "Update progress.bru",
+          "seq": 3,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/rest/progress?PROGRESS_ID=8",
+            "method": "PUT",
+            "headers": [],
+            "params": [
+              {
+                "name": "PROGRESS_ID",
+                "value": "8",
+                "type": "query",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": "{\n  \"HADM_ID\":11,\n  \"SUBJECT_ID\":14\n}",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "folder",
+      "name": "PATIENT",
+      "filename": "PATIENT",
+      "items": [
+        {
+          "type": "http",
+          "name": "Create new patient",
+          "filename": "Create new patient.bru",
+          "seq": 2,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/rest/user?patient_id=28500",
+            "method": "POST",
+            "headers": [],
+            "params": [
+              {
+                "name": "patient_id",
+                "value": "28500",
+                "type": "query",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "mode": "multipartForm",
+              "formUrlEncoded": [],
+              "multipartForm": [
+                {
+                  "type": "text",
+                  "name": "GENDER",
+                  "value": "\"M\"",
+                  "enabled": true
+                },
+                {
+                  "type": "text",
+                  "name": "DOB",
+                  "value": "\"2000-04-26\"",
+                  "enabled": true
+                }
+              ],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "Delete patient information",
+          "filename": "Delete patient information.bru",
+          "seq": 4,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/rest/user?patient_id=3301",
+            "method": "DELETE",
+            "headers": [],
+            "params": [
+              {
+                "name": "patient_id",
+                "value": "3301",
+                "type": "query",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "mode": "none",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "Get patient information",
+          "filename": "Get patient information.bru",
+          "seq": 1,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/rest/user?patient_id=100006",
+            "method": "GET",
+            "headers": [],
+            "params": [
+              {
+                "name": "patient_id",
+                "value": "100006",
+                "type": "query",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "mode": "none",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "Update patient information",
+          "filename": "Update patient information.bru",
+          "seq": 3,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/rest/user?patient_id=100006",
+            "method": "PUT",
+            "headers": [],
+            "params": [
+              {
+                "name": "patient_id",
+                "value": "100006",
+                "type": "query",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "mode": "multipartForm",
+              "formUrlEncoded": [],
+              "multipartForm": [
+                {
+                  "type": "text",
+                  "name": "GENDER",
+                  "value": "\"F\"",
+                  "enabled": true
+                },
+                {
+                  "type": "text",
+                  "name": "DOB",
+                  "value": "\"2001-04-26\"",
+                  "enabled": true
+                }
+              ],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "folder",
+      "name": "QUESTIONS",
+      "filename": "QUESTIONS",
+      "items": [
+        {
+          "type": "http",
+          "name": "Answer question",
+          "filename": "Answer question.bru",
+          "seq": 4,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/rest/caregivers/14213/question",
+            "method": "PUT",
+            "headers": [],
+            "params": [],
+            "body": {
+              "mode": "multipartForm",
+              "formUrlEncoded": [],
+              "multipartForm": [
+                {
+                  "type": "text",
+                  "name": "ANSWER",
+                  "value": "This is the answer",
+                  "enabled": true
+                },
+                {
+                  "type": "text",
+                  "name": "QUESTION_ID",
+                  "value": "3",
+                  "enabled": true
+                }
+              ],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "Get caregivers questions",
+          "filename": "Get caregivers questions.bru",
+          "seq": 3,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/rest/caregivers/14213/question",
+            "method": "GET",
+            "headers": [],
+            "params": [],
+            "body": {
+              "mode": "none",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "Get questions from patient",
+          "filename": "Get questions from patient.bru",
+          "seq": 1,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/rest/patients/79671/question",
+            "method": "GET",
+            "headers": [],
+            "params": [],
+            "body": {
+              "mode": "none",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "Place question",
+          "filename": "Place question.bru",
+          "seq": 2,
+          "request": {
+            "url": "https://project-bdcc.ew.r.appspot.com/rest/patients/79671/question",
+            "method": "POST",
+            "headers": [],
+            "params": [],
+            "body": {
+              "mode": "multipartForm",
+              "formUrlEncoded": [],
+              "multipartForm": [
+                {
+                  "type": "text",
+                  "name": "QUESTION",
+                  "value": "Place a new question",
+                  "enabled": true
+                },
+                {
+                  "type": "text",
+                  "name": "CGID",
+                  "value": "14213",
+                  "enabled": true
+                }
+              ],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "environments": [],
+  "brunoConfig": {
+    "version": "1",
+    "name": "TestAPI",
+    "type": "collection",
+    "ignore": [
+      "node_modules",
+      ".git"
+    ],
+    "size": 0.0029020309448242188,
+    "filesCount": 15
+  }
+}

@@ -62,5 +62,53 @@ class TestProgressEndpoint(unittest.TestCase):
             self.assertEqual(progress["SUBJECT_ID"], 10006)
             self.assertEqual(progress["STATUS"], "COMPLETED")
 
+    def test_create_progress(self):
+        """Test creating a new progress entry via POST."""
+        new_progress = {
+            "HADM_ID": 123456,
+            "SUBJECT_ID": 10007,
+            "EVENT_TYPE": "MEDICATION",
+            "EVENT_DATETIME": "2023-10-02 12:00:00 UTC",
+            "STATUS": "PENDING"
+        }
+        response = requests.post(f"{BASE_URL}/rest/progress", json=new_progress)
+        self.assertEqual(response.status_code, 201)  # 201 Created
+        data = response.json()
+        self.assertEqual(data["HADM_ID"], new_progress["HADM_ID"])
+        self.assertEqual(data["SUBJECT_ID"], new_progress["SUBJECT_ID"])
+        self.assertEqual(data["EVENT_TYPE"], new_progress["EVENT_TYPE"])
+        self.assertEqual(data["EVENT_DATETIME"], new_progress["EVENT_DATETIME"])
+        self.assertEqual(data["STATUS"], new_progress["STATUS"])
+
+    def test_update_progress(self):
+        """Test updating an existing progress entry via PUT."""
+        # First, create a new progress entry to update
+        new_progress = {
+            "HADM_ID": 123457,
+            "SUBJECT_ID": 10008,
+            "EVENT_TYPE": "LAB_TEST",
+            "EVENT_DATETIME": "2023-10-03 12:00:00 UTC",
+            "STATUS": "PENDING"
+        }
+        create_response = requests.post(f"{BASE_URL}/rest/progress", json=new_progress)
+        self.assertEqual(create_response.status_code, 201)
+        created_progress = create_response.json()
+
+        # Update the progress entry using PROGRESS_ID as a query parameter
+        updated_progress = {
+            "HADM_ID": 123457,
+            "SUBJECT_ID": 10008,
+            "EVENT_TYPE": "LAB_TEST",
+            "EVENT_DATETIME": "2023-10-03 12:00:00 UTC",
+            "STATUS": "COMPLETED"  # Updated STATUS
+        }
+        update_response = requests.put(
+            f"{BASE_URL}/rest/progress?PROGRESS_ID={created_progress['PROGRESS_ID']}",
+            json=updated_progress
+        )
+        self.assertEqual(update_response.status_code, 200)
+        updated_data = update_response.json()
+        self.assertEqual(updated_data["STATUS"], updated_progress["STATUS"])
+
 if __name__ == "__main__":
     unittest.main()
