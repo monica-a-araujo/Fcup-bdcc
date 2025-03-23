@@ -4,6 +4,8 @@ from flask import Flask, jsonify, request, redirect, render_template
 from google.cloud import bigquery
 from google.appengine.ext import blobstore, ndb
 from google.appengine.api import wrap_wsgi_app
+import logging
+
 
 app = Flask(__name__)
 bigquery_client = bigquery.Client()
@@ -548,44 +550,61 @@ def admissions():
             return jsonify({"error": str(e)}), 500
 
     elif request.method == "PUT":
-        # Handle PUT request to update an admission
         try:
-            hadm_id = request.args.get('HADM_ID', type=int)
-            if not hadm_id:
-                return jsonify({"error": "HADM_ID is required"}), 400
+            # Try to get ROW_ID from query params or JSON body
+            row_id = request.args.get('ROW_ID', type=int)
+            if not row_id:
+                json_data = request.get_json()
+                row_id = json_data.get('ROW_ID') if json_data else None
 
+            if not row_id:
+                return jsonify({"error": "ROW_ID is required"}), 400
+
+            # Get data from the request body
             data = request.get_json()
-            if not data:
-                return jsonify({"error": "Request body is empty"}), 400
+            if not data or not isinstance(data, dict):
+                return jsonify({"error": "Request body is empty or invalid"}), 400
 
-            # Build the UPDATE query dynamically
+            # Remove ROW_ID from the data if it exists
+            data.pop("ROW_ID", None)
+
+            # Build the update query dynamically
             update_fields = []
             query_params = []
             for key, value in data.items():
-                update_fields.append(f"{key} = @{key}")
                 if isinstance(value, int):
+                    update_fields.append(f"{key} = @{key}")
                     query_params.append(bigquery.ScalarQueryParameter(key, "INT64", value))
                 elif isinstance(value, str):
+                    update_fields.append(f"{key} = @{key}")
                     query_params.append(bigquery.ScalarQueryParameter(key, "STRING", value))
                 else:
                     return jsonify({"error": f"Unsupported data type for column: {key}"}), 400
 
+            if not update_fields:
+                return jsonify({"error": "No valid fields to update"}), 400
+
+            # Build the query
             query = f"""
             UPDATE `project-bdcc.MIMIC.ADMISSIONS`
             SET {', '.join(update_fields)}
-            WHERE HADM_ID = @hadm_id
+            WHERE ROW_ID = @row_id
             """
-            query_params.append(bigquery.ScalarQueryParameter("hadm_id", "INT64", hadm_id))
+            query_params.append(bigquery.ScalarQueryParameter("row_id", "INT64", row_id))
 
             # Execute the query
-            job_config = bigquery.QueryJobConfig()
-            job_config.query_parameters = query_params
+            job_config = bigquery.QueryJobConfig(query_parameters=query_params)
             query_job = bigquery_client.query(query, job_config=job_config)
             query_job.result()  # Wait for the query to complete
 
             return jsonify({"message": "Admission updated successfully"}), 200
+
         except Exception as e:
+            # Log the error for debugging
+            logging.error(f"Error updating admission: {str(e)}")  # Use logging instead of print
             return jsonify({"error": str(e)}), 500
+
+
 
 @app.route("/rest/progress", methods=["GET", "POST", "PUT"])
 def progress():
