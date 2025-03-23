@@ -1,0 +1,8 @@
+Location:               Europe(europe-southwest1)    Tokyo(asia-northeast1)     Sydney(australia-southeast1)
+http.response_time(ms):
+    min:                        345                         539                             627
+    max:                        3514                        8019                            8448
+    mean:                       635.2                       1730.5                          1492.6
+    median:                     584.2                       1274.3                          1200.1
+    p95:                        1353.1                      4403.8                          4147.4
+    p99:                        2369                        6439.7                          6569.8
