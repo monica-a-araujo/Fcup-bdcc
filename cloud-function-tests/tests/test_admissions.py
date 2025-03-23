@@ -46,5 +46,50 @@ class TestAdmissionsEndpoint(unittest.TestCase):
             self.assertEqual(admission["SUBJECT_ID"], 10006)
             self.assertEqual(admission["STATUS"], "active")
 
+    def test_create_admission(self):
+        """Test creating a new admission via POST."""
+        new_admission = {
+            "SUBJECT_ID": 10007,
+            "ADMITTIME": "2023-10-02 12:00:00 UTC",
+            "DISCHTIME": "2023-10-03 12:00:00 UTC",
+            "STATUS": "active"
+        }
+        response = requests.post(f"{BASE_URL}/rest/admissions", json=new_admission)
+        self.assertEqual(response.status_code, 201)  # 201 Created
+        data = response.json()
+        self.assertEqual(data["SUBJECT_ID"], new_admission["SUBJECT_ID"])
+        self.assertEqual(data["ADMITTIME"], new_admission["ADMITTIME"])
+        self.assertEqual(data["DISCHTIME"], new_admission["DISCHTIME"])
+        self.assertEqual(data["STATUS"], new_admission["STATUS"])
+
+    def test_update_admission(self):
+        """Test updating an existing admission via PUT."""
+        # First, create a new admission to update
+        new_admission = {
+            "SUBJECT_ID": 10008,
+            "ADMITTIME": "2023-10-04 12:00:00 UTC",
+            "DISCHTIME": "2023-10-05 12:00:00 UTC",
+            "STATUS": "active"
+        }
+        create_response = requests.post(f"{BASE_URL}/rest/admissions", json=new_admission)
+        self.assertEqual(create_response.status_code, 201)
+        created_admission = create_response.json()
+
+        # Update the admission using HADM_ID as a query parameter
+        updated_admission = {
+            "SUBJECT_ID": 10008,
+            "ADMITTIME": "2023-10-04 12:00:00 UTC",
+            "DISCHTIME": "2023-10-06 12:00:00 UTC",  # Updated DISCHTIME
+            "STATUS": "inactive"  # Updated STATUS
+        }
+        update_response = requests.put(
+            f"{BASE_URL}/rest/admissions?HADM_ID={created_admission['HADM_ID']}",
+            json=updated_admission
+        )
+        self.assertEqual(update_response.status_code, 200)
+        updated_data = update_response.json()
+        self.assertEqual(updated_data["DISCHTIME"], updated_admission["DISCHTIME"])
+        self.assertEqual(updated_data["STATUS"], updated_admission["STATUS"])
+
 if __name__ == "__main__":
     unittest.main()
