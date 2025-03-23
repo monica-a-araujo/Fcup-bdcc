@@ -1,2 +1,5 @@
 requests==2.31.0
 pytest==7.4.0
+google-cloud==2.16.2
+Flask==3.0.0
+google-appengine==1.9.93
