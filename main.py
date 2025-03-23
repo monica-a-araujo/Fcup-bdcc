@@ -1,6 +1,6 @@
 import concurrent.futures
 
-from flask import Flask, jsonify, request, redirect
+from flask import Flask, jsonify, request, redirect, render_template
 from google.cloud import bigquery
 from google.appengine.ext import blobstore, ndb
 from google.appengine.api import wrap_wsgi_app
@@ -12,20 +12,8 @@ app.wsgi_app = wrap_wsgi_app(app.wsgi_app, use_deferred=True)
 
 @app.route("/")
 def querylimits():
-    query_job = bigquery_client.query(
-        """
-        SELECT
-            *
-        FROM `project-bdcc.MIMIC.ADMISSIONS`
-        LIMIT 10
-        """
-    )
+    return redirect("/help")
 
-    rows = query_job.result()
-
-    data = [ {"subject_id": row["SUBJECT_ID"] } for row in rows ]
-
-    return jsonify(data)
 
 # Endpoints that deals with CRUD operations on Users
 @app.route("/rest/user", methods=["GET","POST", "PUT","DELETE"])
@@ -756,43 +744,8 @@ def progress():
 @app.route("/help")
 def help_page():
     """Página de ajuda com links rápidos e input para ID do utilizador."""
-    response = """
-    <html>
-    <head>
-        <title>Help Page</title>
-    </head>
-    <body>
-        <h1>Ajuda e Navegação</h1>
-        <p>Use os links abaixo para aceder rapidamente às funcionalidades do sistema:</p>
-        <ul>
-            <li><a href="/">Página Inicial</a></li>
-            <li><a href="/list_media">Ver Ficheiros</a></li>
-            <li><a href="/rest/user?patient_id=1">Dados do Utilizador</a></li>
-        </ul>
-        <input type="number" id="user_id" placeholder="Introduza o ID do paciente">
-        <button onclick="updateLink()">Gerar Link</button>
-        <p><a id="upload_link" href="#">(O link para o upload media do paciente aparecerá aqui)</a></p>
-        <p><a id="user_link" href="#">(O link para a consulta aparecerá aqui)</a></p>
-
-        <script>
-            function updateLink() {
-                var userId = document.getElementById("user_id").value;
-                if (userId) {
-                    document.getElementById("upload_link").href = "/mediauploadform/" + userId;
-                    document.getElementById("upload_link").innerText = "Upload de Ficheiros (ID: " + userId + ")";
-
-                    document.getElementById("user_link").href = "/rest/user?patient_id=" + userId;
-                    document.getElementById("user_link").innerText = "Consultar Utilizador (ID: " + userId + ")";
-                } else {
-                    alert("Por favor, introduza um ID válido.");
-                }
-            }
-        </script>
-    </body>
-    </html>
-    """
-    return response
-
+    
+    return render_template("help_page.html")
 
 
 if __name__ == "__main__":
