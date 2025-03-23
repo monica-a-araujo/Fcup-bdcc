@@ -1,8 +1,9 @@
 import unittest
 from tests.test_admissions import TestAdmissionsEndpoint
 from tests.test_progress import TestProgressEndpoint
-from tests.test_media import MediaServiceTests
+import functions_framework
 
+@functions_framework.http
 def run_tests(request):
     """Cloud Function entry point."""
     try:
